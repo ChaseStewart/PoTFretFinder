@@ -79,11 +79,12 @@ bool is_config_mode = false;
 bool is_green_not_yellow = false;
 
 /* averaging array for fretfinder */
-#define LIN_POT_ARRAY_LEN 256
-#define CLOSE_ENOUGH 1
+#define LIN_POT_ARRAY_LEN 512
+#define CLOSE_ENOUGH 2
 uint16_t lin_pot_array[LIN_POT_ARRAY_LEN] = {0};
 uint8_t lin_pot_idx = 0;
-uint16_t fret_array[FRET_LEN] = {35,71,106,141,177,212,247,282,318,353,388,424,459,494,530,565,600,636,671,706,742,777,812,847,883,918,953,989,1024};
+uint16_t fret_array[FRET_LEN]  = {35,71,106,141,177,212,247,282,318,353,388,424,459,494,530,565,600,636,671,706,742,777,812,847,883,918,953,989,1024};
+uint16_t fret_midpts[FRET_LEN+1] = {0,17, 53,88,124,159,194,230,264,300,336,370,406,442,476,512,548,582,618,654,688,724,760,794,830,865,900,936,971,1006};
 bool fretWasFound = false;
 
 /**
@@ -343,6 +344,7 @@ static void fretFinder(void)
   float arrayAvg = 0;
   bool fretFound = false;
   int fretIdx = -1;
+  int nearestFret = -1;
   
   lin_pot_array[lin_pot_idx] = analogRead(TEENSY_LIN_POT_PIN);
   lin_pot_idx = ((lin_pot_idx + 1) % LIN_POT_ARRAY_LEN);
@@ -353,10 +355,7 @@ static void fretFinder(void)
   }
 
   arrayAvg = (1.0 * arraySum) / (1.0 * LIN_POT_ARRAY_LEN);
-  Serial.print("\r Fret Reading: ");
-  Serial.print(arrayAvg);
 
-  
   for(int j=0; j<FRET_LEN; j++)
   {
     if (abs(fret_array[j] - arrayAvg) < CLOSE_ENOUGH)
@@ -364,27 +363,37 @@ static void fretFinder(void)
       fretFound = true;
       fretIdx = j;
     }
-  }
-  if (fretFound)
-  {
-    Serial.print(" *** FRET ");    
-    Serial.print(fretIdx, DEC);
-    Serial.print(" FOUND ***");
-    if (!fretWasFound)
+    if (arrayAvg > fret_midpts[j])
     {
+      nearestFret = j;  
+    }
+  }
+
+  Serial.print("\r*** SensorVal=");
+  Serial.print(arrayAvg);
+  
+  Serial.print(", NearestFretIdx=");
+  Serial.print(nearestFret);
+
+  Serial.print(", NearestFretVal=");
+  Serial.print(fret_array[nearestFret]);
+
+  Serial.print(", Close Enough=");
+  Serial.print((fretFound) ? "TRUE":"FALSE");
+  
+  Serial.print(" ***");
+  
+  if (fretFound && !fretWasFound)
+  {
       RotEncSetLED(LED_GREEN);
       fretWasFound = true;
-    }
   }
-  else
+  else if (!fretFound && fretWasFound)
   {
-    Serial.print("                        ");
-    if (fretWasFound)
-    {
-      RotEncSetLED(LED_OFF);
-      fretWasFound = false;
-    }
+    RotEncSetLED(LED_OFF);
+    fretWasFound = false;
   }
+  Serial.print("                     ");
 }
 
 /**
